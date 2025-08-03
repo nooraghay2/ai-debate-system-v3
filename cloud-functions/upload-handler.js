@@ -6,10 +6,23 @@ const Busboy = require('busboy');
 const storage = new Storage();
 const bucket = storage.bucket(process.env.UPLOAD_BUCKET || 'ai-debate-uploads');
 
-// Handle base64 upload
+// Handle base64 upload (single file or chunked)
 async function handleBase64Upload(req, res) {
     try {
-        const { videoData, fileName, fileType, fileSize, email, topic } = req.body;
+        const { 
+            videoData, 
+            fileName, 
+            fileType, 
+            fileSize, 
+            email, 
+            topic,
+            // Chunked upload fields
+            uploadId,
+            chunkIndex,
+            totalChunks,
+            chunkData,
+            isLastChunk
+        } = req.body;
 
         console.log('Base64 upload data:', {
             fileName,
@@ -17,9 +30,20 @@ async function handleBase64Upload(req, res) {
             fileSize,
             email,
             topic,
-            hasVideoData: !!videoData
+            hasVideoData: !!videoData,
+            hasChunkData: !!chunkData,
+            uploadId,
+            chunkIndex,
+            totalChunks,
+            isLastChunk
         });
 
+        // Check if this is a chunked upload
+        if (chunkData && uploadId !== undefined) {
+            return await handleChunkedUpload(req, res);
+        }
+
+        // Handle single file upload
         if (!videoData) {
             return res.status(400).json({
                 success: false,
@@ -116,6 +140,161 @@ async function handleBase64Upload(req, res) {
         res.status(500).json({
             success: false,
             error: 'Failed to process base64 upload',
+            details: error.message
+        });
+    }
+}
+
+// Handle chunked upload
+async function handleChunkedUpload(req, res) {
+    try {
+        const { 
+            uploadId,
+            chunkIndex,
+            totalChunks,
+            chunkData,
+            fileName,
+            fileType,
+            fileSize,
+            email,
+            topic,
+            isLastChunk
+        } = req.body;
+
+        console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks} for upload ${uploadId}`);
+
+        if (!chunkData) {
+            return res.status(400).json({
+                success: false,
+                error: 'No chunk data provided'
+            });
+        }
+
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid email address is required'
+            });
+        }
+
+        if (!fileType.startsWith('video/')) {
+            return res.status(400).json({
+                success: false,
+                error: 'Only video files are allowed'
+            });
+        }
+
+        // Convert chunk to buffer
+        const chunkBuffer = Buffer.from(chunkData, 'base64');
+        console.log(`Chunk ${chunkIndex + 1} size:`, chunkBuffer.length);
+
+        // Store chunk in temporary location
+        const chunkPath = `temp/${uploadId}/chunk_${chunkIndex}`;
+        const chunkFile = bucket.file(chunkPath);
+        await chunkFile.save(chunkBuffer);
+
+        console.log(`Chunk ${chunkIndex + 1} stored at:`, chunkPath);
+
+        // If this is the last chunk, combine all chunks
+        if (isLastChunk) {
+            console.log('Combining chunks...');
+            
+            // Generate unique filename
+            const fileId = uuidv4();
+            const fileExtension = path.extname(fileName);
+            const newFileName = `upload_${fileId}${fileExtension}`;
+            const filePath = `videos/${newFileName}`;
+
+            // Combine all chunks
+            const chunks = [];
+            for (let i = 0; i < totalChunks; i++) {
+                const tempChunkPath = `temp/${uploadId}/chunk_${i}`;
+                const tempChunkFile = bucket.file(tempChunkPath);
+                const [tempChunkBuffer] = await tempChunkFile.download();
+                chunks.push(tempChunkBuffer);
+            }
+
+            const combinedBuffer = Buffer.concat(chunks);
+            console.log('Combined file size:', combinedBuffer.length);
+
+            // Upload combined file
+            const file = bucket.file(filePath);
+            await file.save(combinedBuffer, {
+                metadata: {
+                    contentType: fileType,
+                    metadata: {
+                        originalName: fileName,
+                        userEmail: email,
+                        topic: topic || '',
+                        uploadedAt: new Date().toISOString(),
+                        fileId: fileId
+                    }
+                }
+            });
+
+            // Make file publicly readable
+            await file.makePublic();
+
+            // Clean up temporary chunks
+            for (let i = 0; i < totalChunks; i++) {
+                const tempChunkPath = `temp/${uploadId}/chunk_${i}`;
+                const tempChunkFile = bucket.file(tempChunkPath);
+                await tempChunkFile.delete().catch(err => console.log('Error deleting temp chunk:', err));
+            }
+
+            console.log('File uploaded successfully to Cloud Storage');
+
+            // Trigger video processing
+            const processingPayload = {
+                videoUrl: `https://storage.googleapis.com/${bucket.name}/${filePath}`,
+                fileId: fileId,
+                fileName: fileName,
+                userEmail: email,
+                topic: topic || '',
+                timestamp: new Date().toISOString()
+            };
+
+            const cloudRunUrl = process.env.CLOUD_RUN_URL || 'https://processdebatevideo-497659694361.us-central1.run.app/processDebateVideo';
+            
+            console.log('Triggering video processing at:', cloudRunUrl);
+            
+            const processingResponse = await fetch(cloudRunUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(processingPayload)
+            });
+
+            if (!processingResponse.ok) {
+                console.error('Processing trigger failed:', await processingResponse.text());
+            } else {
+                console.log('Video processing triggered successfully');
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'Video uploaded successfully and processing started',
+                fileId: fileId,
+                fileName: fileName,
+                fileSize: combinedBuffer.length,
+                processingTriggered: processingResponse.ok,
+                isLastChunk: true
+            });
+        } else {
+            // Not the last chunk, just acknowledge receipt
+            res.status(200).json({
+                success: true,
+                message: `Chunk ${chunkIndex + 1} uploaded successfully`,
+                isLastChunk: false
+            });
+        }
+
+    } catch (error) {
+        console.error('Chunked upload error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to process chunked upload',
             details: error.message
         });
     }

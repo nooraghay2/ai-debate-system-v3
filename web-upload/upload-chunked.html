@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chunked Upload Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; }
+        .result { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .info { background: #d1ecf1; }
+        .progress { margin: 10px 0; }
+        progress { width: 100%; height: 20px; }
+        .debug-info { background: #f8f9fa; padding: 10px; margin: 10px 0; border: 1px solid #dee2e6; }
+    </style>
+</head>
+<body>
+    <h1>Chunked Upload Test</h1>
+    
+    <div class="debug-info">
+        <h3>Debug Information</h3>
+        <p><strong>Function URL:</strong> <span id="functionUrl"></span></p>
+        <p><strong>Chunk Size:</strong> <span id="chunkSize">5MB</span></p>
+    </div>
+    
+    <input type="file" id="testFile" accept="video/*">
+    <input type="email" id="emailInput" placeholder="Email" value="test@example.com">
+    <input type="text" id="topicInput" placeholder="Topic" value="test">
+    <button onclick="testChunkedUpload()">Test Chunked Upload</button>
+    
+    <div class="progress">
+        <progress id="progressBar" value="0" max="100" style="display: none;"></progress>
+        <div id="progressText"></div>
+    </div>
+    
+    <div id="result" class="result"></div>
+
+    <script>
+        const functionUrl = 'https://us-central1-ai-human-api-system.cloudfunctions.net/upload-video';
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+        
+        // Update debug info
+        document.getElementById('functionUrl').textContent = functionUrl;
+        document.getElementById('chunkSize').textContent = (CHUNK_SIZE / 1024 / 1024) + 'MB';
+        
+        async function testChunkedUpload() {
+            const fileInput = document.getElementById('testFile');
+            const emailInput = document.getElementById('emailInput');
+            const topicInput = document.getElementById('topicInput');
+            const resultDiv = document.getElementById('result');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.textContent = 'Please select a file first.';
+                resultDiv.className = 'result error';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const email = emailInput.value;
+            const topic = topicInput.value;
+            
+            resultDiv.textContent = 'Starting chunked upload...';
+            resultDiv.className = 'result info';
+            progressBar.style.display = 'block';
+            progressBar.value = 0;
+            progressText.textContent = 'Preparing upload...';
+            
+            try {
+                // Calculate number of chunks
+                const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                console.log(`File size: ${file.size}, Chunk size: ${CHUNK_SIZE}, Total chunks: ${totalChunks}`);
+                
+                // Generate unique upload ID
+                const uploadId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                
+                // Upload chunks
+                for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                    const start = chunkIndex * CHUNK_SIZE;
+                    const end = Math.min(start + CHUNK_SIZE, file.size);
+                    const chunk = file.slice(start, end);
+                    
+                    progressText.textContent = `Uploading chunk ${chunkIndex + 1} of ${totalChunks}...`;
+                    progressBar.value = ((chunkIndex + 1) / totalChunks) * 100;
+                    
+                    console.log(`Uploading chunk ${chunkIndex + 1}/${totalChunks}: ${start}-${end} bytes`);
+                    
+                    // Convert chunk to base64
+                    const chunkBase64 = await fileChunkToBase64(chunk);
+                    
+                    // Upload chunk
+                    const chunkPayload = {
+                        uploadId: uploadId,
+                        chunkIndex: chunkIndex,
+                        totalChunks: totalChunks,
+                        chunkData: chunkBase64,
+                        fileName: file.name,
+                        fileType: file.type,
+                        fileSize: file.size,
+                        email: email,
+                        topic: topic,
+                        isLastChunk: chunkIndex === totalChunks - 1
+                    };
+                    
+                    const response = await fetch(functionUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(chunkPayload)
+                    });
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`Chunk ${chunkIndex + 1} upload failed: ${response.status} - ${errorText}`);
+                    }
+                    
+                    const result = await response.json();
+                    console.log(`Chunk ${chunkIndex + 1} result:`, result);
+                    
+                    if (result.success && result.isLastChunk) {
+                        progressText.textContent = 'Upload complete!';
+                        resultDiv.textContent = `Upload successful!
+File: ${file.name}
+Size: ${(file.size / 1024 / 1024).toFixed(2)} MB
+Chunks: ${totalChunks}
+File ID: ${result.fileId}`;
+                        resultDiv.className = 'result success';
+                        return;
+                    }
+                }
+                
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.className = 'result error';
+                console.error('Upload error:', error);
+            }
+        }
+        
+        function fileChunkToBase64(chunk) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = () => {
+                    const base64 = reader.result.split(',')[1]; // Remove data URL prefix
+                    resolve(base64);
+                };
+                
+                reader.onerror = () => {
+                    reject(new Error('Failed to read chunk'));
+                };
+                
+                reader.readAsDataURL(chunk);
+            });
+        }
+    </script>
+</body>
+</html> 
