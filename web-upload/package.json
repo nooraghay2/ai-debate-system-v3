@@ -1,0 +1,13 @@
+{
+  "name": "debate-upload-web",
+  "version": "1.0.0",
+  "description": "Web interface for AI Debate System",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "dev": "python3 -m http.server 8080"
+  },
+  "keywords": ["ai", "debate", "upload", "web"],
+  "author": "Your Name",
+  "license": "MIT"
+} 

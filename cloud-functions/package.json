@@ -1,0 +1,17 @@
+{
+  "name": "upload-handler",
+  "version": "1.0.0",
+  "description": "Cloud Function for video upload handling",
+  "main": "upload-handler.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.0.0",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^9.0.0"
+  },
+  "keywords": ["google-cloud", "upload", "video", "cloud-function"],
+  "author": "Your Name",
+  "license": "MIT"
+} 

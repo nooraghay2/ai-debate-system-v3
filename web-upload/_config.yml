@@ -1,0 +1,18 @@
+# Jekyll configuration for GitHub Pages
+title: AI Debate Response System
+description: Upload debate videos and get AI-generated responses
+baseurl: ""
+url: "https://your-username.github.io"
+
+# Build settings
+theme: jekyll-theme-minimal
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+
+# Exclude from processing
+exclude:
+  - node_modules
+  - package.json
+  - package-lock.json
+  - README.md 

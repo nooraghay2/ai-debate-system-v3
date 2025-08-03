@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Debate Response System - Video Upload</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 AI Debate Response System</h1>
+            <p>Upload your debate video and get an AI-generated response</p>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-content">
+                        <div class="upload-icon">📹</div>
+                        <h3>Upload Your Debate Video</h3>
+                        <p>Drag and drop your video file here or click to browse</p>
+                        <p class="file-info">Supported formats: MP4, MOV, AVI (Max 100MB)</p>
+                        <input type="file" id="videoFile" accept="video/*" style="display: none;">
+                        <button class="upload-btn" onclick="document.getElementById('videoFile').click()">
+                            Choose Video File
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="form-group">
+                        <label for="userEmail">Email Address:</label>
+                        <input type="email" id="userEmail" placeholder="your.email@example.com" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="debateTopic">Debate Topic (Optional):</label>
+                        <input type="text" id="debateTopic" placeholder="e.g., Climate Change, AI Ethics, etc.">
+                    </div>
+
+                    <button class="submit-btn" id="submitBtn" disabled>
+                        Process Video
+                    </button>
+                </div>
+            </div>
+
+            <div class="progress-section" id="progressSection" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p id="progressText">Uploading video...</p>
+            </div>
+
+            <div class="result-section" id="resultSection" style="display: none;">
+                <div class="success-message">
+                    <h3>✅ Video Processing Started!</h3>
+                    <p>Your video is being processed by our AI system. You'll receive an email with the download link when it's ready.</p>
+                    <div class="processing-steps">
+                        <div class="step">
+                            <span class="step-number">1</span>
+                            <span>Video uploaded to cloud storage</span>
+                        </div>
+                        <div class="step">
+                            <span class="step-number">2</span>
+                            <span>AI transcription in progress...</span>
+                        </div>
+                        <div class="step">
+                            <span class="step-number">3</span>
+                            <span>Generating AI response...</span>
+                        </div>
+                        <div class="step">
+                            <span class="step-number">4</span>
+                            <span>Creating response video...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="upload.js"></script>
+</body>
+</html> 
