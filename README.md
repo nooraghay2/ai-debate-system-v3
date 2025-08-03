@@ -12,7 +12,7 @@ A modern web-based AI debate response system that allows users to upload debate 
 
 ## 🚀 Live Demo
 
-**Web Interface:** [https://your-username.github.io/ai-debate-system-v3/](https://your-username.github.io/ai-debate-system-v3/)
+**Web Interface:** [https://nooraghay2.github.io/ai-debate-system-v3/](https://nooraghay2.github.io/ai-debate-system-v3/)
 
 ## 🏗️ Architecture
 
@@ -58,7 +58,7 @@ ai-debate-system-v3/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/ai-debate-system-v3.git
+git clone https://github.com/nooraghay2/ai-debate-system-v3.git
 cd ai-debate-system-v3
 ```
 
@@ -153,13 +153,13 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 If you encounter any issues:
 
-1. Check the [Issues](https://github.com/your-username/ai-debate-system-v3/issues) page
+1. Check the [Issues](https://github.com/nooraghay2/ai-debate-system-v3/issues) page
 2. Create a new issue with detailed information
 3. Include error messages and steps to reproduce
 
 ## 🔄 Updates
 
-This project is actively maintained. Check the [Releases](https://github.com/your-username/ai-debate-system-v3/releases) page for the latest updates.
+This project is actively maintained. Check the [Releases](https://github.com/nooraghay2/ai-debate-system-v3/releases) page for the latest updates.
 
 ---
 
