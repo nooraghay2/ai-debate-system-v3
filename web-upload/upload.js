@@ -45,6 +45,7 @@ class VideoUploader {
     }
 
     handleFileSelect(file) {
+        console.log('File selected:', file);
         if (!file) return;
 
         // Validate file type
@@ -71,10 +72,15 @@ class VideoUploader {
             <h3>File Selected</h3>
             <p><strong>${file.name}</strong></p>
             <p>Size: ${this.formatFileSize(file.size)}</p>
-            <button class="upload-btn" onclick="document.getElementById('videoFile').click()">
+            <button class="upload-btn" id="chooseDifferentFile">
                 Choose Different File
             </button>
         `;
+        
+        // Add event listener to the new button
+        document.getElementById('chooseDifferentFile').addEventListener('click', () => {
+            this.fileInput.click();
+        });
 
         this.updateSubmitButton();
     }
@@ -91,11 +97,24 @@ class VideoUploader {
         const email = document.getElementById('userEmail').value.trim();
         const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
         
-        this.submitBtn.disabled = !(this.selectedFile && isValidEmail);
+        const shouldEnable = this.selectedFile && isValidEmail;
+        console.log('Update submit button:', {
+            hasFile: !!this.selectedFile,
+            isValidEmail: isValidEmail,
+            shouldEnable: shouldEnable
+        });
+        
+        this.submitBtn.disabled = !shouldEnable;
     }
 
     async uploadVideo() {
-        if (!this.selectedFile) return;
+        console.log('Upload button clicked');
+        console.log('Selected file:', this.selectedFile);
+        
+        if (!this.selectedFile) {
+            alert('Please select a video file first.');
+            return;
+        }
 
         const email = document.getElementById('userEmail').value.trim();
         const topic = document.getElementById('debateTopic').value.trim();
