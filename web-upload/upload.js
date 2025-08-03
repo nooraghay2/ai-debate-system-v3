@@ -105,15 +105,17 @@ class VideoUploader {
         this.submitBtn.disabled = true;
 
         try {
-            // Check file size - if too large, show warning
-            const maxSize = 50 * 1024 * 1024; // 50MB limit for base64 upload
-            if (this.selectedFile.size > maxSize) {
-                alert(`File size (${this.formatFileSize(this.selectedFile.size)}) is too large for upload. Please use a file smaller than 50MB.`);
-                this.hideProgress();
+            // Check if file is large enough to need chunked upload (over 50MB)
+            const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50MB
+            
+            if (this.selectedFile.size > LARGE_FILE_THRESHOLD) {
+                // Use chunked upload for large files
+                console.log('Large file detected, using chunked upload...');
+                await this.uploadLargeFile(email, topic);
                 return;
             }
 
-            // Convert file to base64
+            // For smaller files, use base64 upload
             this.updateProgress(10, 'Converting file to base64...');
             const base64 = await this.fileToBase64(this.selectedFile);
             
@@ -187,6 +189,75 @@ class VideoUploader {
             } else {
                 alert(`Upload failed: ${error.message}`);
             }
+            this.hideProgress();
+        }
+    }
+
+    async uploadLargeFile(email, topic) {
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+        
+        try {
+            // Calculate number of chunks
+            const totalChunks = Math.ceil(this.selectedFile.size / CHUNK_SIZE);
+            console.log(`File size: ${this.selectedFile.size}, Chunk size: ${CHUNK_SIZE}, Total chunks: ${totalChunks}`);
+            
+            // Generate unique upload ID
+            const uploadId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+            
+            // Upload chunks
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                const start = chunkIndex * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, this.selectedFile.size);
+                const chunk = this.selectedFile.slice(start, end);
+                
+                const progressPercent = 10 + ((chunkIndex + 1) / totalChunks) * 80; // 10% to 90%
+                this.updateProgress(progressPercent, `Uploading chunk ${chunkIndex + 1} of ${totalChunks}...`);
+                
+                console.log(`Uploading chunk ${chunkIndex + 1}/${totalChunks}: ${start}-${end} bytes`);
+                
+                // Convert chunk to base64
+                const chunkBase64 = await this.fileToBase64(chunk);
+                
+                // Upload chunk
+                const chunkPayload = {
+                    uploadId: uploadId,
+                    chunkIndex: chunkIndex,
+                    totalChunks: totalChunks,
+                    chunkData: chunkBase64,
+                    fileName: this.selectedFile.name,
+                    fileType: this.selectedFile.type,
+                    fileSize: this.selectedFile.size,
+                    email: email,
+                    topic: topic,
+                    isLastChunk: chunkIndex === totalChunks - 1
+                };
+                
+                const response = await fetch(this.uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(chunkPayload)
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Chunk ${chunkIndex + 1} upload failed: ${response.status} - ${errorText}`);
+                }
+                
+                const result = await response.json();
+                console.log(`Chunk ${chunkIndex + 1} result:`, result);
+                
+                if (result.success && result.isLastChunk) {
+                    this.updateProgress(100, 'Upload complete!');
+                    setTimeout(() => this.showSuccess(), 500);
+                    return;
+                }
+            }
+            
+        } catch (error) {
+            console.error('Chunked upload error:', error);
+            alert(`Chunked upload failed: ${error.message}`);
             this.hideProgress();
         }
     }
