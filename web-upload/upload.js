@@ -10,7 +10,7 @@ class VideoUploader {
         
         this.selectedFile = null;
         // This URL will be updated when we deploy the Cloud Function
-        this.uploadUrl = 'https://YOUR_CLOUD_FUNCTION_URL'; // Will be set to your Cloud Function URL
+        this.uploadUrl = 'https://us-central1-ai-human-api-system.cloudfunctions.net/upload-video';
         
         this.initializeEventListeners();
     }
