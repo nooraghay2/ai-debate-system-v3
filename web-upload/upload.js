@@ -105,22 +105,36 @@ class VideoUploader {
         this.submitBtn.disabled = true;
 
         try {
-            // Create form data
-            const formData = new FormData();
-            formData.append('video', this.selectedFile);
-            formData.append('email', email);
-            formData.append('topic', topic);
+            // Convert file to base64
+            this.updateProgress(10, 'Converting file to base64...');
+            const base64 = await this.fileToBase64(this.selectedFile);
+            
+            this.updateProgress(30, 'Preparing upload...');
+            
+            // Create JSON payload
+            const payload = {
+                videoData: base64,
+                fileName: this.selectedFile.name,
+                fileType: this.selectedFile.type,
+                fileSize: this.selectedFile.size,
+                email: email,
+                topic: topic
+            };
 
-            // Simulate progress for now (will be replaced with actual upload)
-            this.simulateProgress();
+            this.updateProgress(50, 'Uploading to server...');
 
             // Upload to Cloud Function
             const response = await fetch(this.uploadUrl, {
                 method: 'POST',
-                body: formData,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload),
                 mode: 'cors',
                 credentials: 'omit'
             });
+
+            this.updateProgress(90, 'Processing...');
 
             if (!response.ok) {
                 throw new Error(`Upload failed: ${response.statusText}`);
@@ -129,7 +143,8 @@ class VideoUploader {
             const result = await response.json();
 
             if (result.success) {
-                this.showSuccess();
+                this.updateProgress(100, 'Upload successful!');
+                setTimeout(() => this.showSuccess(), 500);
             } else {
                 throw new Error(result.error || 'Upload failed');
             }
@@ -141,17 +156,24 @@ class VideoUploader {
         }
     }
 
-    simulateProgress() {
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += Math.random() * 15;
-            if (progress >= 100) {
-                progress = 100;
-                clearInterval(interval);
-            }
-            this.updateProgress(progress, `Uploading... ${Math.round(progress)}%`);
-        }, 200);
+    fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = () => {
+                const base64 = reader.result.split(',')[1]; // Remove data URL prefix
+                resolve(base64);
+            };
+            
+            reader.onerror = () => {
+                reject(new Error('Failed to read file'));
+            };
+            
+            reader.readAsDataURL(file);
+        });
     }
+
+
 
     showSuccess() {
         this.progressSection.style.display = 'none';
