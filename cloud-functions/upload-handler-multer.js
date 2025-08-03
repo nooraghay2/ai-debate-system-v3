@@ -1,4 +1,5 @@
 const { Storage } = require('@google-cloud/storage');
+const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const Busboy = require('busboy');
@@ -6,8 +7,26 @@ const Busboy = require('busboy');
 const storage = new Storage();
 const bucket = storage.bucket(process.env.UPLOAD_BUCKET || 'ai-debate-uploads');
 
+// Configure multer for memory storage with more lenient settings
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 100 * 1024 * 1024, // 100MB limit
+        fieldSize: 10 * 1024 * 1024, // 10MB field size
+    },
+    fileFilter: (req, file, cb) => {
+        console.log('File filter called with:', file);
+        // Check file type
+        if (file.mimetype.startsWith('video/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only video files are allowed'), false);
+        }
+    }
+}).single('video');
+
 exports.uploadVideo = async (req, res) => {
-    // Enable CORS
+    // Enable CORS with more comprehensive headers
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
     res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Content-Length');
@@ -20,98 +39,51 @@ exports.uploadVideo = async (req, res) => {
     }
 
     try {
-        console.log('Processing upload request...');
-        console.log('Content-Type:', req.headers['content-type']);
-        console.log('Content-Length:', req.headers['content-length']);
-
-        // Check if it's multipart/form-data
-        if (!req.headers['content-type'] || !req.headers['content-type'].includes('multipart/form-data')) {
-            return res.status(400).json({
-                success: false,
-                error: 'Content-Type must be multipart/form-data'
-            });
-        }
-
-        const busboy = Busboy({
+        // Log the incoming request for debugging
+        console.log('Incoming request:', {
+            method: req.method,
             headers: req.headers,
-            limits: {
-                fileSize: 100 * 1024 * 1024, // 100MB limit
-                files: 1
-            }
+            contentType: req.headers['content-type'],
+            contentLength: req.headers['content-length'],
+            body: req.body,
+            files: req.files
         });
-
-        let fileData = null;
-        let email = null;
-        let topic = null;
-        let hasError = false;
-
-        busboy.on('file', (fieldname, file, info) => {
-            console.log('Processing file:', fieldname, info);
+        
+        // Handle file upload with better error handling
+        upload(req, res, async (err) => {
+            console.log('Multer processing completed');
+            console.log('Error:', err);
+            console.log('Request file:', req.file);
+            console.log('Request body:', req.body);
+            if (err && err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'File too large. Maximum size is 100MB.'
+                });
+            }
             
-            if (fieldname !== 'video') {
-                hasError = true;
+            if (err && err.code === 'LIMIT_UNEXPECTED_FILE') {
                 return res.status(400).json({
                     success: false,
-                    error: 'Only "video" field is allowed for file upload'
+                    error: 'Unexpected file field. Please use "video" as the field name.'
+                });
+            }
+            if (err) {
+                console.error('Upload error:', err);
+                return res.status(400).json({
+                    success: false,
+                    error: err.message
                 });
             }
 
-            if (!info.mimeType.startsWith('video/')) {
-                hasError = true;
-                return res.status(400).json({
-                    success: false,
-                    error: 'Only video files are allowed'
-                });
-            }
-
-            const chunks = [];
-            file.on('data', (chunk) => {
-                chunks.push(chunk);
-            });
-
-            file.on('end', () => {
-                fileData = {
-                    buffer: Buffer.concat(chunks),
-                    originalname: info.filename,
-                    mimetype: info.mimeType,
-                    size: Buffer.concat(chunks).length
-                };
-                console.log('File received:', fileData.originalname, 'Size:', fileData.size);
-            });
-
-            file.on('error', (err) => {
-                console.error('File processing error:', err);
-                hasError = true;
-                return res.status(400).json({
-                    success: false,
-                    error: 'File processing error: ' + err.message
-                });
-            });
-        });
-
-        busboy.on('field', (fieldname, value) => {
-            console.log('Field received:', fieldname, value);
-            if (fieldname === 'email') {
-                email = value;
-            } else if (fieldname === 'topic') {
-                topic = value;
-            }
-        });
-
-        busboy.on('finish', async () => {
-            if (hasError) return;
-
-            console.log('Busboy finished processing');
-            console.log('File data:', fileData ? 'Present' : 'Missing');
-            console.log('Email:', email);
-            console.log('Topic:', topic);
-
-            if (!fileData) {
+            if (!req.file) {
                 return res.status(400).json({
                     success: false,
                     error: 'No video file provided'
                 });
             }
+
+            const { email, topic } = req.body;
 
             if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                 return res.status(400).json({
@@ -123,19 +95,26 @@ exports.uploadVideo = async (req, res) => {
             try {
                 // Generate unique filename
                 const fileId = uuidv4();
-                const fileExtension = path.extname(fileData.originalname);
+                const fileExtension = path.extname(req.file.originalname);
                 const fileName = `upload_${fileId}${fileExtension}`;
                 const filePath = `videos/${fileName}`;
 
-                console.log('Uploading to Cloud Storage:', filePath);
+                console.log('Uploading file:', {
+                    originalName: req.file.originalname,
+                    fileId: fileId,
+                    filePath: filePath,
+                    size: req.file.size,
+                    email: email,
+                    topic: topic
+                });
 
                 // Upload to Cloud Storage
                 const file = bucket.file(filePath);
-                await file.save(fileData.buffer, {
+                await file.save(req.file.buffer, {
                     metadata: {
-                        contentType: fileData.mimetype,
+                        contentType: req.file.mimetype,
                         metadata: {
-                            originalName: fileData.originalname,
+                            originalName: req.file.originalname,
                             userEmail: email,
                             topic: topic || '',
                             uploadedAt: new Date().toISOString(),
@@ -153,14 +132,14 @@ exports.uploadVideo = async (req, res) => {
                 const processingPayload = {
                     videoUrl: `https://storage.googleapis.com/${bucket.name}/${filePath}`,
                     fileId: fileId,
-                    fileName: fileData.originalname,
+                    fileName: req.file.originalname,
                     userEmail: email,
                     topic: topic || '',
                     timestamp: new Date().toISOString()
                 };
 
                 // Send to Cloud Run for processing
-                const cloudRunUrl = process.env.CLOUD_RUN_URL || 'https://processdebatevideo-497659694361.us-central1.run.app/processDebateVideo';
+                const cloudRunUrl = process.env.CLOUD_RUN_URL || 'https://processdebatevideo-ai-human-api-system.us-central1.run.app/processDebateVideo';
                 
                 console.log('Triggering video processing at:', cloudRunUrl);
                 
@@ -174,6 +153,8 @@ exports.uploadVideo = async (req, res) => {
 
                 if (!processingResponse.ok) {
                     console.error('Processing trigger failed:', await processingResponse.text());
+                    // Don't fail the upload, just log the error
+                    // The processing can be retried later
                 } else {
                     console.log('Video processing triggered successfully');
                 }
@@ -182,8 +163,8 @@ exports.uploadVideo = async (req, res) => {
                     success: true,
                     message: 'Video uploaded successfully and processing started',
                     fileId: fileId,
-                    fileName: fileData.originalname,
-                    fileSize: fileData.size,
+                    fileName: req.file.originalname,
+                    fileSize: req.file.size,
                     processingTriggered: processingResponse.ok
                 });
 
@@ -196,17 +177,6 @@ exports.uploadVideo = async (req, res) => {
                 });
             }
         });
-
-        busboy.on('error', (err) => {
-            console.error('Busboy error:', err);
-            res.status(400).json({
-                success: false,
-                error: 'Upload processing error: ' + err.message
-            });
-        });
-
-        // Pipe the request to busboy
-        req.pipe(busboy);
 
     } catch (error) {
         console.error('General error:', error);
