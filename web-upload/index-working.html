@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Debate Response System - Video Upload</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .upload-area {
+            border: 3px dashed #ddd;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .upload-area.has-file {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .upload-area h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .upload-area p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .file-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .progress-section {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .result-section {
+            display: none;
+            margin-top: 30px;
+            padding: 30px;
+            background: #f8fff9;
+            border-radius: 15px;
+            border: 2px solid #28a745;
+        }
+
+        .success-message h3 {
+            color: #28a745;
+            margin-bottom: 15px;
+        }
+
+        .processing-steps {
+            margin-top: 20px;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-weight: bold;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .choose-file-btn {
+            background: #667eea;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+
+        .choose-file-btn:hover {
+            background: #5a6fd8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI Debate Response System</h1>
+            <p>Upload your debate video and get an AI-generated response</p>
+        </div>
+
+        <div class="main-content">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📹</div>
+                <h3>Upload Your Debate Video</h3>
+                <p>Drag and drop your video file here or click to browse</p>
+                <p style="color: #667eea; font-weight: 500;">Supported formats: MP4, MOV, AVI (Max 100MB)</p>
+                <p style="color: #28a745; font-size: 14px;">Large files are automatically chunked for reliable upload</p>
+                <input type="file" id="fileInput" accept="video/*">
+                <button class="choose-file-btn" onclick="document.getElementById('fileInput').click()">
+                    Choose Video File
+                </button>
+            </div>
+
+            <div class="file-info" id="fileInfo">
+                <h4>Selected File:</h4>
+                <p id="fileName"></p>
+                <p id="fileSize"></p>
+            </div>
+
+            <div class="form-group">
+                <label for="userEmail">Email Address:</label>
+                <input type="email" id="userEmail" placeholder="your.email@example.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="debateTopic">Debate Topic (Optional):</label>
+                <input type="text" id="debateTopic" placeholder="e.g., Climate Change, AI Ethics, etc.">
+            </div>
+
+            <button class="submit-btn" id="submitBtn" disabled>
+                Process Video
+            </button>
+
+            <div class="error-message" id="errorMessage"></div>
+
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p class="progress-text" id="progressText">Uploading video...</p>
+            </div>
+
+            <div class="result-section" id="resultSection">
+                <div class="success-message">
+                    <h3>✅ Video Processing Started!</h3>
+                    <p>Your video is being processed by our AI system. You'll receive an email with the download link when it's ready.</p>
+                    <div class="processing-steps">
+                        <div class="step">
+                            <span class="step-number">1</span>
+                            <span>Video uploaded to cloud storage</span>
+                        </div>
+                        <div class="step">
+                            <span class="step-number">2</span>
+                            <span>AI transcription in progress...</span>
+                        </div>
+                        <div class="step">
+                            <span class="step-number">3</span>
+                            <span>Generating AI response...</span>
+                        </div>
+                        <div class="step">
+                            <span class="step-number">4</span>
+                            <span>Creating response video...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Working Upload Handler - matches the working chunked upload page exactly
+        const functionUrl = 'https://us-central1-ai-human-api-system.cloudfunctions.net/upload-video';
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+        
+        class WorkingUploader {
+            constructor() {
+                this.selectedFile = null;
+                this.initializeElements();
+                this.initializeEventListeners();
+            }
+
+            initializeElements() {
+                this.uploadArea = document.getElementById('uploadArea');
+                this.fileInput = document.getElementById('fileInput');
+                this.submitBtn = document.getElementById('submitBtn');
+                this.fileInfo = document.getElementById('fileInfo');
+                this.fileName = document.getElementById('fileName');
+                this.fileSize = document.getElementById('fileSize');
+                this.progressSection = document.getElementById('progressSection');
+                this.progressFill = document.getElementById('progressFill');
+                this.progressText = document.getElementById('progressText');
+                this.resultSection = document.getElementById('resultSection');
+                this.errorMessage = document.getElementById('errorMessage');
+            }
+
+            initializeEventListeners() {
+                // File input change
+                this.fileInput.addEventListener('change', (e) => {
+                    this.handleFileSelect(e.target.files[0]);
+                });
+
+                // Drag and drop
+                this.uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    this.uploadArea.classList.add('dragover');
+                });
+
+                this.uploadArea.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    this.uploadArea.classList.remove('dragover');
+                });
+
+                this.uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    this.uploadArea.classList.remove('dragover');
+                    this.handleFileSelect(e.dataTransfer.files[0]);
+                });
+
+                // Submit button
+                this.submitBtn.addEventListener('click', () => {
+                    this.uploadVideo();
+                });
+
+                // Email validation
+                document.getElementById('userEmail').addEventListener('input', () => {
+                    this.updateSubmitButton();
+                });
+            }
+
+            handleFileSelect(file) {
+                console.log('File selected:', file);
+                
+                if (!file) return;
+
+                // Validate file type
+                if (!file.type.startsWith('video/')) {
+                    this.showError('Please select a valid video file.');
+                    return;
+                }
+
+                // Validate file size (100MB limit)
+                const maxSize = 100 * 1024 * 1024;
+                if (file.size > maxSize) {
+                    this.showError('File size must be less than 100MB.');
+                    return;
+                }
+
+                this.selectedFile = file;
+                this.uploadArea.classList.add('has-file');
+                this.uploadArea.classList.remove('dragover');
+                
+                // Update file info
+                this.fileName.textContent = `Name: ${file.name}`;
+                this.fileSize.textContent = `Size: ${this.formatFileSize(file.size)}`;
+                this.fileInfo.classList.add('show');
+                
+                // Update upload area
+                this.uploadArea.innerHTML = `
+                    <div class="upload-icon">✅</div>
+                    <h3>File Selected</h3>
+                    <p><strong>${file.name}</strong></p>
+                    <p>Size: ${this.formatFileSize(file.size)}</p>
+                    <button class="choose-file-btn" onclick="document.getElementById('fileInput').click()">
+                        Choose Different File
+                    </button>
+                `;
+
+                this.updateSubmitButton();
+                this.hideError();
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            updateSubmitButton() {
+                const email = document.getElementById('userEmail').value.trim();
+                const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+                
+                const shouldEnable = this.selectedFile && isValidEmail;
+                console.log('Update submit button:', {
+                    hasFile: !!this.selectedFile,
+                    isValidEmail: isValidEmail,
+                    shouldEnable: shouldEnable
+                });
+                
+                this.submitBtn.disabled = !shouldEnable;
+            }
+
+            async uploadVideo() {
+                console.log('Upload button clicked');
+                console.log('Selected file:', this.selectedFile);
+                
+                if (!this.selectedFile) {
+                    this.showError('Please select a video file first.');
+                    return;
+                }
+
+                const email = document.getElementById('userEmail').value.trim();
+                const topic = document.getElementById('debateTopic').value.trim();
+
+                // Show progress
+                this.progressSection.style.display = 'block';
+                this.submitBtn.disabled = true;
+                this.hideError();
+
+                try {
+                    // Always use chunked upload for consistency with working page
+                    await this.uploadLargeFile(email, topic);
+
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    this.showError(`Upload failed: ${error.message}`);
+                    this.hideProgress();
+                }
+            }
+
+            async uploadLargeFile(email, topic) {
+                try {
+                    const totalChunks = Math.ceil(this.selectedFile.size / CHUNK_SIZE);
+                    console.log(`File size: ${this.selectedFile.size}, Chunk size: ${CHUNK_SIZE}, Total chunks: ${totalChunks}`);
+                    
+                    const uploadId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                    
+                    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                        const start = chunkIndex * CHUNK_SIZE;
+                        const end = Math.min(start + CHUNK_SIZE, this.selectedFile.size);
+                        const chunk = this.selectedFile.slice(start, end);
+                        
+                        const progressPercent = ((chunkIndex + 1) / totalChunks) * 100;
+                        this.updateProgress(progressPercent, `Uploading chunk ${chunkIndex + 1} of ${totalChunks}...`);
+                        
+                        console.log(`Uploading chunk ${chunkIndex + 1}/${totalChunks}: ${start}-${end} bytes`);
+                        
+                        const chunkBase64 = await this.fileChunkToBase64(chunk);
+                        
+                        const chunkPayload = {
+                            uploadId: uploadId,
+                            chunkIndex: chunkIndex,
+                            totalChunks: totalChunks,
+                            chunkData: chunkBase64,
+                            fileName: this.selectedFile.name,
+                            fileType: this.selectedFile.type,
+                            fileSize: this.selectedFile.size,
+                            email: email,
+                            topic: topic,
+                            isLastChunk: chunkIndex === totalChunks - 1
+                        };
+                        
+                        // Use exact same fetch as working chunked upload page
+                        const response = await fetch(functionUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(chunkPayload)
+                        });
+                        
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(`Chunk ${chunkIndex + 1} upload failed: ${response.status} - ${errorText}`);
+                        }
+                        
+                        const result = await response.json();
+                        console.log(`Chunk ${chunkIndex + 1} result:`, result);
+                        
+                        if (result.success && result.isLastChunk) {
+                            this.updateProgress(100, 'Upload complete!');
+                            setTimeout(() => this.showSuccess(), 500);
+                            return;
+                        }
+                    }
+                    
+                } catch (error) {
+                    console.error('Chunked upload error:', error);
+                    this.showError(`Chunked upload failed: ${error.message}`);
+                    this.hideProgress();
+                }
+            }
+
+            fileChunkToBase64(chunk) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    
+                    reader.onload = () => {
+                        const base64 = reader.result.split(',')[1]; // Remove data URL prefix
+                        resolve(base64);
+                    };
+                    
+                    reader.onerror = () => {
+                        reject(new Error('Failed to read chunk'));
+                    };
+                    
+                    reader.readAsDataURL(chunk);
+                });
+            }
+
+            showSuccess() {
+                this.progressSection.style.display = 'none';
+                this.resultSection.style.display = 'block';
+                this.resultSection.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            hideProgress() {
+                this.progressSection.style.display = 'none';
+                this.submitBtn.disabled = false;
+            }
+
+            updateProgress(percent, text) {
+                this.progressFill.style.width = `${percent}%`;
+                this.progressText.textContent = text;
+            }
+
+            showError(message) {
+                this.errorMessage.textContent = message;
+                this.errorMessage.style.display = 'block';
+            }
+
+            hideError() {
+                this.errorMessage.style.display = 'none';
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, initializing WorkingUploader...');
+            
+            try {
+                const uploader = new WorkingUploader();
+                console.log('WorkingUploader initialized successfully');
+            } catch (error) {
+                console.error('Error initializing WorkingUploader:', error);
+            }
+        });
+    </script>
+</body>
+</html> 
