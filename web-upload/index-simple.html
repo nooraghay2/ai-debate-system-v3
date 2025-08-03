@@ -488,13 +488,27 @@
 
                     this.updateProgress(50, 'Uploading to server...');
 
-                    const response = await fetch(this.uploadUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
+                    console.log('Sending request to:', this.uploadUrl);
+                    console.log('Request payload size:', JSON.stringify(payload).length);
+                    
+                    // Add timeout for the request
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+                    
+                    try {
+                        const response = await fetch(this.uploadUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            mode: 'cors',
+                            credentials: 'omit',
+                            signal: controller.signal,
+                            body: JSON.stringify(payload)
+                        });
+                        
+                        clearTimeout(timeoutId);
 
                     this.updateProgress(90, 'Processing...');
 
@@ -512,6 +526,13 @@
                         throw new Error(result.error || 'Upload failed');
                     }
 
+                    } catch (fetchError) {
+                        clearTimeout(timeoutId);
+                        if (fetchError.name === 'AbortError') {
+                            throw new Error('Upload timed out after 60 seconds');
+                        }
+                        throw fetchError;
+                    }
                 } catch (error) {
                     console.error('Upload error:', error);
                     this.showError(`Upload failed: ${error.message}`);
@@ -553,13 +574,35 @@
                             isLastChunk: chunkIndex === totalChunks - 1
                         };
                         
-                        const response = await fetch(this.uploadUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(chunkPayload)
-                        });
+                        console.log(`Sending chunk ${chunkIndex + 1} to:`, this.uploadUrl);
+                        console.log(`Chunk payload size:`, JSON.stringify(chunkPayload).length);
+                        
+                        // Add timeout for chunk upload
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout per chunk
+                        
+                        try {
+                            const response = await fetch(this.uploadUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json'
+                                },
+                                mode: 'cors',
+                                credentials: 'omit',
+                                signal: controller.signal,
+                                body: JSON.stringify(chunkPayload)
+                            });
+                            
+                            clearTimeout(timeoutId);
+                        
+                        } catch (fetchError) {
+                            clearTimeout(timeoutId);
+                            if (fetchError.name === 'AbortError') {
+                                throw new Error(`Chunk ${chunkIndex + 1} upload timed out after 30 seconds`);
+                            }
+                            throw fetchError;
+                        }
                         
                         if (!response.ok) {
                             const errorText = await response.text();
