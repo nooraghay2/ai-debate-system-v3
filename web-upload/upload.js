@@ -313,7 +313,6 @@ class VideoUploader {
             throw new Error(result.error || 'Multipart upload failed');
         }
     }
-    }
 
     fileToBase64(file) {
         return new Promise((resolve, reject) => {
@@ -355,10 +354,19 @@ class VideoUploader {
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    const uploader = new VideoUploader();
+    console.log('DOM loaded, initializing VideoUploader...');
     
-    // Add email validation
-    document.getElementById('userEmail').addEventListener('input', () => {
-        uploader.updateSubmitButton();
-    });
+    try {
+        const uploader = new VideoUploader();
+        console.log('VideoUploader initialized successfully');
+        
+        // Add email validation
+        document.getElementById('userEmail').addEventListener('input', () => {
+            uploader.updateSubmitButton();
+        });
+        
+        console.log('Email validation listener added');
+    } catch (error) {
+        console.error('Error initializing VideoUploader:', error);
+    }
 }); 
