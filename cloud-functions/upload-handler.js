@@ -92,8 +92,13 @@ async function handleBase64Upload(req, res) {
             }
         });
 
-        // Make file publicly readable (for processing)
-        await file.makePublic();
+        // Make file publicly readable (for processing) - handle gracefully if permission denied
+        try {
+            await file.makePublic();
+            console.log('File made public successfully');
+        } catch (error) {
+            console.log('Could not make file public (this is okay for processing):', error.message);
+        }
 
         console.log('File uploaded successfully to Cloud Storage');
 
@@ -191,9 +196,14 @@ async function handleChunkedUpload(req, res) {
         // Store chunk in temporary location
         const chunkPath = `temp/${uploadId}/chunk_${chunkIndex}`;
         const chunkFile = bucket.file(chunkPath);
-        await chunkFile.save(chunkBuffer);
-
-        console.log(`Chunk ${chunkIndex + 1} stored at:`, chunkPath);
+        
+        try {
+            await chunkFile.save(chunkBuffer);
+            console.log(`Chunk ${chunkIndex + 1} stored at:`, chunkPath);
+        } catch (error) {
+            console.error(`Failed to store chunk ${chunkIndex + 1}:`, error);
+            throw new Error(`Failed to store chunk ${chunkIndex + 1}: ${error.message}`);
+        }
 
         // If this is the last chunk, combine all chunks
         if (isLastChunk) {
@@ -232,8 +242,13 @@ async function handleChunkedUpload(req, res) {
                 }
             });
 
-            // Make file publicly readable
-            await file.makePublic();
+            // Make file publicly readable - handle gracefully if permission denied
+            try {
+                await file.makePublic();
+                console.log('File made public successfully');
+            } catch (error) {
+                console.log('Could not make file public (this is okay for processing):', error.message);
+            }
 
             // Clean up temporary chunks
             for (let i = 0; i < totalChunks; i++) {
