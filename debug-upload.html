@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug Upload Test</h1>
+    
+    <div class="test-section">
+        <h3>Test 1: Simple POST Request</h3>
+        <button onclick="testSimplePost()">Test Simple POST</button>
+        <div id="simpleResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test 2: File Upload with FormData</h3>
+        <input type="file" id="testFile" accept="video/*">
+        <button onclick="testFileUpload()">Test File Upload</button>
+        <div id="fileResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test 3: Browser Console Log</h3>
+        <button onclick="testConsoleLog()">Check Console</button>
+        <div id="consoleResult" class="result"></div>
+    </div>
+
+    <script>
+        const functionUrl = 'https://us-central1-ai-human-api-system.cloudfunctions.net/upload-video';
+
+        async function testSimplePost() {
+            const resultDiv = document.getElementById('simpleResult');
+            resultDiv.textContent = 'Testing simple POST...';
+            resultDiv.className = 'result info';
+            
+            try {
+                console.log('Making simple POST request to:', functionUrl);
+                
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ test: 'data' })
+                });
+                
+                console.log('Response received:', response);
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                const data = await response.text();
+                console.log('Response data:', data);
+                
+                resultDiv.textContent = `Simple POST Result:
+Status: ${response.status}
+Status Text: ${response.statusText}
+Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}
+Response: ${data}`;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                console.error('Simple POST Error:', error);
+                resultDiv.textContent = `Simple POST Error: ${error.message}
+Stack: ${error.stack}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testFileUpload() {
+            const fileInput = document.getElementById('testFile');
+            const resultDiv = document.getElementById('fileResult');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.textContent = 'Please select a video file first.';
+                resultDiv.className = 'result error';
+                return;
+            }
+            
+            resultDiv.textContent = 'Testing file upload...';
+            resultDiv.className = 'result info';
+            
+            try {
+                const formData = new FormData();
+                formData.append('video', fileInput.files[0]);
+                formData.append('email', 'test@example.com');
+                formData.append('topic', 'Test upload');
+                
+                console.log('Making file upload request to:', functionUrl);
+                console.log('File:', fileInput.files[0]);
+                console.log('FormData entries:');
+                for (let [key, value] of formData.entries()) {
+                    console.log(key, value);
+                }
+                
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('Response received:', response);
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                const data = await response.text();
+                console.log('Response data:', data);
+                
+                resultDiv.textContent = `File Upload Result:
+Status: ${response.status}
+Status Text: ${response.statusText}
+Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}
+Response: ${data}`;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                console.error('File Upload Error:', error);
+                resultDiv.textContent = `File Upload Error: ${error.message}
+Stack: ${error.stack}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        function testConsoleLog() {
+            const resultDiv = document.getElementById('consoleResult');
+            resultDiv.textContent = 'Check the browser console (F12) for detailed logs.';
+            resultDiv.className = 'result info';
+        }
+
+        // Log when page loads
+        console.log('Debug page loaded');
+        console.log('Function URL:', functionUrl);
+        console.log('Current origin:', window.location.origin);
+    </script>
+</body>
+</html> 
