@@ -117,7 +117,9 @@ class VideoUploader {
             // Upload to Cloud Function
             const response = await fetch(this.uploadUrl, {
                 method: 'POST',
-                body: formData
+                body: formData,
+                mode: 'cors',
+                credentials: 'omit'
             });
 
             if (!response.ok) {

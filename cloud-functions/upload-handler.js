@@ -26,8 +26,9 @@ exports.uploadVideo = async (req, res) => {
     // Enable CORS with more comprehensive headers
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Content-Length');
     res.set('Access-Control-Allow-Credentials', 'true');
+    res.set('Access-Control-Max-Age', '86400');
 
     if (req.method === 'OPTIONS') {
         res.status(204).send('');
