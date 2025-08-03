@@ -105,6 +105,14 @@ class VideoUploader {
         this.submitBtn.disabled = true;
 
         try {
+            // Check file size - if too large, show warning
+            const maxSize = 50 * 1024 * 1024; // 50MB limit for base64 upload
+            if (this.selectedFile.size > maxSize) {
+                alert(`File size (${this.formatFileSize(this.selectedFile.size)}) is too large for upload. Please use a file smaller than 50MB.`);
+                this.hideProgress();
+                return;
+            }
+
             // Convert file to base64
             this.updateProgress(10, 'Converting file to base64...');
             const base64 = await this.fileToBase64(this.selectedFile);
@@ -121,9 +129,19 @@ class VideoUploader {
                 topic: topic
             };
 
+            console.log('Uploading file:', {
+                name: this.selectedFile.name,
+                size: this.selectedFile.size,
+                base64Length: base64.length,
+                payloadSize: JSON.stringify(payload).length
+            });
+
             this.updateProgress(50, 'Uploading to server...');
 
-            // Upload to Cloud Function
+            // Upload to Cloud Function with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
             const response = await fetch(this.uploadUrl, {
                 method: 'POST',
                 headers: {
@@ -131,13 +149,16 @@ class VideoUploader {
                 },
                 body: JSON.stringify(payload),
                 mode: 'cors',
-                credentials: 'omit'
+                credentials: 'omit',
+                signal: controller.signal
             });
 
+            clearTimeout(timeoutId);
             this.updateProgress(90, 'Processing...');
 
             if (!response.ok) {
-                throw new Error(`Upload failed: ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`Upload failed: ${response.status} - ${errorText}`);
             }
 
             const result = await response.json();
@@ -150,10 +171,58 @@ class VideoUploader {
             }
 
         } catch (error) {
-            console.error('Upload error:', error);
-            alert(`Upload failed: ${error.message}`);
+            console.error('Base64 upload error:', error);
+            
+            // Try fallback to multipart upload
+            if (error.name === 'AbortError' || error.message.includes('Failed to fetch')) {
+                this.updateProgress(50, 'Trying alternative upload method...');
+                
+                try {
+                    await this.tryMultipartUpload(email, topic);
+                    return;
+                } catch (multipartError) {
+                    console.error('Multipart upload also failed:', multipartError);
+                    alert('Both upload methods failed. Please try again with a smaller file or check your connection.');
+                }
+            } else {
+                alert(`Upload failed: ${error.message}`);
+            }
             this.hideProgress();
         }
+    }
+
+    async tryMultipartUpload(email, topic) {
+        this.updateProgress(60, 'Trying multipart upload...');
+        
+        // Create FormData
+        const formData = new FormData();
+        formData.append('video', this.selectedFile);
+        formData.append('email', email);
+        formData.append('topic', topic);
+
+        const response = await fetch(this.uploadUrl, {
+            method: 'POST',
+            body: formData,
+            mode: 'cors',
+            credentials: 'omit'
+        });
+
+        this.updateProgress(90, 'Processing...');
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Multipart upload failed: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            this.updateProgress(100, 'Upload successful!');
+            setTimeout(() => this.showSuccess(), 500);
+        } else {
+            throw new Error(result.error || 'Multipart upload failed');
+        }
+    }
     }
 
     fileToBase64(file) {
