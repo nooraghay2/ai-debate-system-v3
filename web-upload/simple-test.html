@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple FormData Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; }
+        .result { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+    </style>
+</head>
+<body>
+    <h1>Simple FormData Test</h1>
+    
+    <input type="file" id="testFile" accept="video/*">
+    <button onclick="testUpload()">Test Upload</button>
+    
+    <div id="result" class="result"></div>
+
+    <script>
+        const functionUrl = 'https://us-central1-ai-human-api-system.cloudfunctions.net/upload-video';
+        
+        async function testUpload() {
+            const fileInput = document.getElementById('testFile');
+            const resultDiv = document.getElementById('result');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.textContent = 'Please select a file first.';
+                resultDiv.className = 'result error';
+                return;
+            }
+            
+            resultDiv.textContent = 'Uploading...';
+            resultDiv.className = 'result';
+            
+            try {
+                // Create FormData
+                const formData = new FormData();
+                formData.append('video', fileInput.files[0]);
+                formData.append('email', 'test@example.com');
+                formData.append('topic', 'test');
+                
+                // Log FormData contents
+                console.log('FormData entries:');
+                for (let [key, value] of formData.entries()) {
+                    console.log(key, value);
+                }
+                
+                // Make request
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.text();
+                
+                resultDiv.textContent = `Status: ${response.status}
+Response: ${data}`;
+                resultDiv.className = response.ok ? 'result success' : 'result error';
+                
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.className = 'result error';
+                console.error('Upload error:', error);
+            }
+        }
+    </script>
+</body>
+</html> 

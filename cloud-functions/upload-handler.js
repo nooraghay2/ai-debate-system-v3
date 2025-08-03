@@ -6,13 +6,15 @@ const { v4: uuidv4 } = require('uuid');
 const storage = new Storage();
 const bucket = storage.bucket(process.env.UPLOAD_BUCKET || 'ai-debate-uploads');
 
-// Configure multer for memory storage
+// Configure multer for memory storage with more lenient settings
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
         fileSize: 100 * 1024 * 1024, // 100MB limit
+        fieldSize: 10 * 1024 * 1024, // 10MB field size
     },
     fileFilter: (req, file, cb) => {
+        console.log('File filter called with:', file);
         // Check file type
         if (file.mimetype.startsWith('video/')) {
             cb(null, true);
@@ -20,7 +22,7 @@ const upload = multer({
             cb(new Error('Only video files are allowed'), false);
         }
     }
-});
+}).single('video');
 
 exports.uploadVideo = async (req, res) => {
     // Enable CORS with more comprehensive headers
@@ -36,8 +38,35 @@ exports.uploadVideo = async (req, res) => {
     }
 
     try {
-        // Handle file upload
-        upload.single('video')(req, res, async (err) => {
+        // Log the incoming request for debugging
+        console.log('Incoming request:', {
+            method: req.method,
+            headers: req.headers,
+            contentType: req.headers['content-type'],
+            contentLength: req.headers['content-length'],
+            body: req.body,
+            files: req.files
+        });
+        
+        // Handle file upload with better error handling
+        upload(req, res, async (err) => {
+            console.log('Multer processing completed');
+            console.log('Error:', err);
+            console.log('Request file:', req.file);
+            console.log('Request body:', req.body);
+            if (err && err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'File too large. Maximum size is 100MB.'
+                });
+            }
+            
+            if (err && err.code === 'LIMIT_UNEXPECTED_FILE') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Unexpected file field. Please use "video" as the field name.'
+                });
+            }
             if (err) {
                 console.error('Upload error:', err);
                 return res.status(400).json({
