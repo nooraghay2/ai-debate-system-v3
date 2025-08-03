@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base64 Upload Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; }
+        .result { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .progress { margin: 10px 0; }
+        progress { width: 100%; height: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Base64 Upload Test</h1>
+    
+    <input type="file" id="testFile" accept="video/*">
+    <input type="email" id="emailInput" placeholder="Email" value="test@example.com">
+    <input type="text" id="topicInput" placeholder="Topic" value="test">
+    <button onclick="testUpload()">Test Base64 Upload</button>
+    
+    <div class="progress">
+        <progress id="progressBar" value="0" max="100" style="display: none;"></progress>
+        <div id="progressText"></div>
+    </div>
+    
+    <div id="result" class="result"></div>
+
+    <script>
+        const functionUrl = 'https://us-central1-ai-human-api-system.cloudfunctions.net/upload-video';
+        
+        async function testUpload() {
+            const fileInput = document.getElementById('testFile');
+            const emailInput = document.getElementById('emailInput');
+            const topicInput = document.getElementById('topicInput');
+            const resultDiv = document.getElementById('result');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.textContent = 'Please select a file first.';
+                resultDiv.className = 'result error';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const email = emailInput.value;
+            const topic = topicInput.value;
+            
+            resultDiv.textContent = 'Converting file to base64...';
+            resultDiv.className = 'result';
+            progressBar.style.display = 'block';
+            progressBar.value = 0;
+            progressText.textContent = 'Converting file...';
+            
+            try {
+                // Convert file to base64
+                const base64 = await fileToBase64(file, (progress) => {
+                    progressBar.value = progress;
+                    progressText.textContent = `Converting: ${progress}%`;
+                });
+                
+                progressText.textContent = 'Uploading...';
+                progressBar.value = 50;
+                
+                // Send as JSON with base64 data
+                const payload = {
+                    videoData: base64,
+                    fileName: file.name,
+                    fileType: file.type,
+                    fileSize: file.size,
+                    email: email,
+                    topic: topic
+                };
+                
+                console.log('Sending payload:', {
+                    fileName: file.name,
+                    fileSize: file.size,
+                    email: email,
+                    topic: topic
+                });
+                
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.text();
+                
+                progressBar.value = 100;
+                progressText.textContent = 'Complete!';
+                
+                resultDiv.textContent = `Status: ${response.status}
+Response: ${data}`;
+                resultDiv.className = response.ok ? 'result success' : 'result error';
+                
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.className = 'result error';
+                console.error('Upload error:', error);
+            }
+        }
+        
+        function fileToBase64(file, progressCallback) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = () => {
+                    const base64 = reader.result.split(',')[1]; // Remove data URL prefix
+                    resolve(base64);
+                };
+                
+                reader.onerror = () => {
+                    reject(new Error('Failed to read file'));
+                };
+                
+                reader.onprogress = (event) => {
+                    if (event.lengthComputable) {
+                        const progress = Math.round((event.loaded / event.total) * 100);
+                        progressCallback(progress);
+                    }
+                };
+                
+                reader.readAsDataURL(file);
+            });
+        }
+    </script>
+</body>
+</html> 

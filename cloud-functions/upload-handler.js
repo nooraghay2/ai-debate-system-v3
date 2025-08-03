@@ -6,6 +6,121 @@ const Busboy = require('busboy');
 const storage = new Storage();
 const bucket = storage.bucket(process.env.UPLOAD_BUCKET || 'ai-debate-uploads');
 
+// Handle base64 upload
+async function handleBase64Upload(req, res) {
+    try {
+        const { videoData, fileName, fileType, fileSize, email, topic } = req.body;
+
+        console.log('Base64 upload data:', {
+            fileName,
+            fileType,
+            fileSize,
+            email,
+            topic,
+            hasVideoData: !!videoData
+        });
+
+        if (!videoData) {
+            return res.status(400).json({
+                success: false,
+                error: 'No video data provided'
+            });
+        }
+
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid email address is required'
+            });
+        }
+
+        if (!fileType.startsWith('video/')) {
+            return res.status(400).json({
+                success: false,
+                error: 'Only video files are allowed'
+            });
+        }
+
+        // Convert base64 to buffer
+        const buffer = Buffer.from(videoData, 'base64');
+        console.log('Converted base64 to buffer, size:', buffer.length);
+
+        // Generate unique filename
+        const fileId = uuidv4();
+        const fileExtension = path.extname(fileName);
+        const newFileName = `upload_${fileId}${fileExtension}`;
+        const filePath = `videos/${newFileName}`;
+
+        console.log('Uploading to Cloud Storage:', filePath);
+
+        // Upload to Cloud Storage
+        const file = bucket.file(filePath);
+        await file.save(buffer, {
+            metadata: {
+                contentType: fileType,
+                metadata: {
+                    originalName: fileName,
+                    userEmail: email,
+                    topic: topic || '',
+                    uploadedAt: new Date().toISOString(),
+                    fileId: fileId
+                }
+            }
+        });
+
+        // Make file publicly readable (for processing)
+        await file.makePublic();
+
+        console.log('File uploaded successfully to Cloud Storage');
+
+        // Trigger video processing
+        const processingPayload = {
+            videoUrl: `https://storage.googleapis.com/${bucket.name}/${filePath}`,
+            fileId: fileId,
+            fileName: fileName,
+            userEmail: email,
+            topic: topic || '',
+            timestamp: new Date().toISOString()
+        };
+
+        // Send to Cloud Run for processing
+        const cloudRunUrl = process.env.CLOUD_RUN_URL || 'https://processdebatevideo-497659694361.us-central1.run.app/processDebateVideo';
+        
+        console.log('Triggering video processing at:', cloudRunUrl);
+        
+        const processingResponse = await fetch(cloudRunUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(processingPayload)
+        });
+
+        if (!processingResponse.ok) {
+            console.error('Processing trigger failed:', await processingResponse.text());
+        } else {
+            console.log('Video processing triggered successfully');
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Video uploaded successfully and processing started',
+            fileId: fileId,
+            fileName: fileName,
+            fileSize: buffer.length,
+            processingTriggered: processingResponse.ok
+        });
+
+    } catch (error) {
+        console.error('Base64 upload error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to process base64 upload',
+            details: error.message
+        });
+    }
+}
+
 exports.uploadVideo = async (req, res) => {
     // Enable CORS
     res.set('Access-Control-Allow-Origin', '*');
@@ -24,13 +139,25 @@ exports.uploadVideo = async (req, res) => {
         console.log('Content-Type:', req.headers['content-type']);
         console.log('Content-Length:', req.headers['content-length']);
 
-        // Check if it's multipart/form-data
-        if (!req.headers['content-type'] || !req.headers['content-type'].includes('multipart/form-data')) {
+        // Check if it's JSON (for base64 upload) or multipart/form-data
+        const isJson = req.headers['content-type'] && req.headers['content-type'].includes('application/json');
+        const isMultipart = req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data');
+
+        if (!isJson && !isMultipart) {
             return res.status(400).json({
                 success: false,
-                error: 'Content-Type must be multipart/form-data'
+                error: 'Content-Type must be application/json or multipart/form-data'
             });
         }
+
+        // Handle JSON base64 upload
+        if (isJson) {
+            console.log('Processing JSON base64 upload...');
+            return await handleBase64Upload(req, res);
+        }
+
+        // Handle multipart upload (existing code)
+        console.log('Processing multipart upload...');
 
         const busboy = Busboy({
             headers: req.headers,
